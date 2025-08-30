@@ -1,21 +1,184 @@
-﻿@page
-@model IndexModel
+@page
 @{
-    ViewData["Title"] = "Home page";
+    Layout = null;
 }
-<h2>@ViewData["Title"]</h2>
-<h3>@Model.Message</h3>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FDI Dummy Application - Demo</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;margin:20px;max-width:900px}
+    label{display:block;margin-top:12px;font-weight:600}
+    select,input,textarea{width:100%;padding:8px;margin-top:6px;border:1px solid #ccc;border-radius:4px}
+    .small{width:260px;display:inline-block;margin-right:12px}
+    .section{padding:12px;border:1px solid #eee;border-radius:6px;margin-top:14px;background:#fafafa}
+    button{margin-top:16px;padding:10px 14px;border:0;background:#0366d6;color:#fff;border-radius:6px;cursor:pointer}
+  </style>
+</head>
+<body>
+  <h2>FDI Application (Dummy) — Demo</h2>
+  <p style="color:#666;margin-top:-10px">This demo replicates real portal behavior: one dropdown controls the next, sections appear conditionally, and you can preview the filled draft.</p>
 
-<p>This template consists of a single content page (<i>Index</i>) with layout and error pages.</p>
+  <form id="fdiForm" onsubmit="return false;">
+    <div class="section">
+      <label>Applicant Category</label>
+      <select id="category" name="Category" onchange="onCategoryChange()">
+        <option value="">-- Select --</option>
+        <option value="Company">Company</option>
+        <option value="Individual">Individual</option>
+        <option value="Others">Others</option>
+      </select>
 
-<p>It was created by manually stripping down the project generated with command <i>dotnet new razor</i>.</p>
+      <label>Category Type</label>
+      <select id="categoryType" name="CategoryType">
+        <option value="">-- Select --</option>
+      </select>
 
-<p>For more information, check the <a href="https://github.com/chopeen/minimal-razor">project repository</a> at GitHub.</p>
+      <div id="companyFields" style="display:none;margin-top:12px">
+        <label>Company — CIN (if incorporated)</label>
+        <input type="text" id="cin" name="CIN" placeholder="Enter CIN (if any)" />
+        <label>Company — Entity Name</label>
+        <input type="text" id="entityName" name="EntityName" placeholder="Entity name" />
+      </div>
 
-<!--
-    TODO: Modify the information here to explain the new page(s)
+      <div id="individualFields" style="display:none;margin-top:12px">
+        <label>Individual — Passport / ID Number</label>
+        <input type="text" id="pid" name="PassportID" placeholder="Passport or national ID" />
+      </div>
 
-    TODO: Add this information to README
+      <div id="othersFields" style="display:none;margin-top:12px">
+        <label>Other Category — please specify</label>
+        <input type="text" id="othersDetail" name="OthersDetail" placeholder="LLP / AIF / Trust etc." />
+      </div>
+    </div>
 
-    TODO: Update the screenshot
--->
+    <div class="section">
+      <label>Whether Investee is Incorporated?</label>
+      <select id="incorporated" name="Incorporated" onchange="onIncorporatedChange()">
+        <option value="">-- Select --</option>
+        <option value="Incorporated">Incorporated</option>
+        <option value="YetToBeIncorporated">Yet to be incorporated</option>
+      </select>
+
+      <div id="incorporatedBlock" style="display:none;margin-top:12px">
+        <label>If incorporated — CIN</label>
+        <input type="text" id="cin2" name="CIN2" />
+        <label>Existing Business Activity (short)</label>
+        <input type="text" id="existingActivity" name="ExistingActivity" />
+      </div>
+
+      <div id="proposedBlock" style="display:none;margin-top:12px">
+        <label>Proposed Entity Name</label>
+        <input type="text" id="proposedName" name="ProposedName" />
+        <label>Proposed Business Activity</label>
+        <input type="text" id="proposedActivity" name="ProposedActivity" />
+      </div>
+    </div>
+
+    <div class="section">
+      <label>Nature of Proposal</label>
+      <select id="proposalNature" name="ProposalNature" onchange="onProposalChange()">
+        <option value="">-- Select --</option>
+        <option value="Fresh">Fresh</option>
+        <option value="Amendment">Amendment</option>
+      </select>
+
+      <div id="amendmentBlock" style="display:none;margin-top:12px">
+        <label>If Amendment — Old FIPB / Case Reference No.</label>
+        <input type="text" id="oldRef" name="OldRef" />
+      </div>
+
+      <label style="margin-top:10px">Is there existing FDI?</label>
+      <select id="existingFdi" name="ExistingFDI" onchange="onExistingFdiChange()">
+        <option value="">-- Select --</option>
+        <option value="Yes">Yes</option>
+        <option value="No">No</option>
+      </select>
+
+      <div id="existingFdiBlock" style="display:none;margin-top:12px">
+        <label>Existing FDI (INR)</label>
+        <input type="number" id="existingFdiAmt" name="ExistingFdiAmt" />
+        <label>Proposed FDI (INR)</label>
+        <input type="number" id="proposedFdiAmt" name="ProposedFdiAmt" />
+      </div>
+
+      <div id="noExistingFdiBlock" style="display:none;margin-top:12px">
+        <label>Proposed FDI (INR)</label>
+        <input type="number" id="proposedFdiAmtOnly" name="ProposedFdiAmtOnly" />
+      </div>
+    </div>
+
+    <button type="button" onclick="preview()">Preview (Review Draft)</button>
+    <button type="button" onclick="downloadJson()" style="margin-left:8px;background:#2d9f6b">Download JSON</button>
+  </form>
+
+<script>
+const categoryOptions = {
+  Company: ["Foreign","Indian (Self)","Indian (Authorised Representative)"],
+  Individual: ["Foreigner","Indian","NRI","PIO (Self/Authorised Representative)"],
+  Others: ["LLP","AIF","FPI","VCF","QIB","QFI","Trust","FVCI","Other (please specify)"]
+};
+
+function onCategoryChange(){
+  const cat = document.getElementById('category').value;
+  const ct = document.getElementById('categoryType');
+  ct.innerHTML = '<option value="">-- Select --</option>';
+  hideAllCatBlocks();
+  if(!cat) return;
+  categoryOptions[cat].forEach(o=>{
+    const opt = document.createElement('option'); opt.value=o; opt.text=o; ct.add(opt);
+  });
+  if(cat==='Company') document.getElementById('companyFields').style.display='block';
+  if(cat==='Individual') document.getElementById('individualFields').style.display='block';
+  if(cat==='Others') document.getElementById('othersFields').style.display='block';
+}
+
+function hideAllCatBlocks(){
+  document.getElementById('companyFields').style.display='none';
+  document.getElementById('individualFields').style.display='none';
+  document.getElementById('othersFields').style.display='none';
+}
+
+function onIncorporatedChange(){
+  const v = document.getElementById('incorporated').value;
+  document.getElementById('incorporatedBlock').style.display = v==='Incorporated' ? 'block':'none';
+  document.getElementById('proposedBlock').style.display = v==='YetToBeIncorporated' ? 'block':'none';
+}
+
+function onProposalChange(){
+  const v = document.getElementById('proposalNature').value;
+  document.getElementById('amendmentBlock').style.display = v==='Amendment' ? 'block':'none';
+}
+
+function onExistingFdiChange(){
+  const v = document.getElementById('existingFdi').value;
+  document.getElementById('existingFdiBlock').style.display = v==='Yes' ? 'block':'none';
+  document.getElementById('noExistingFdiBlock').style.display = v==='No' ? 'block':'none';
+}
+
+function preview(){
+  const form = document.getElementById('fdiForm');
+  const fd = new FormData(form);
+  let html = '<h2>Review - Draft</h2><ul>';
+  for(const [k,v] of fd.entries()){
+    html += `<li><strong>${k}:</strong> ${v}</li>`;
+  }
+  html += '</ul>';
+  const w = window.open('','_blank','width=900,height=700,scrollbars=yes');
+  w.document.write(html);
+}
+
+function downloadJson(){
+  const form = document.getElementById('fdiForm');
+  const fd = new FormData(form);
+  const obj = {};
+  for(const [k,v] of fd.entries()){ obj[k]=v; }
+  const blob = new Blob([JSON.stringify(obj,null,2)],{type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='fdi-draft.json'; a.click(); URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
